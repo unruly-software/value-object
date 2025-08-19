@@ -2421,12 +2421,9 @@ __metadata:
     prettier: 2.8.8
     typescript: 5.0.4
     vitest: ^0.31.3
-    zod: ^3.21.4
+    zod: ^4.0.17
   peerDependencies:
-    zod: ^3.0.0
-  peerDependenciesMeta:
-    zod:
-      optional: true
+    zod: ^4.0.0
   languageName: unknown
   linkType: soft
 
@@ -8520,9 +8517,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^3.21.4":
-  version: 3.22.4
-  resolution: "zod@npm:3.22.4"
-  checksum: 80bfd7f8039b24fddeb0718a2ec7c02aa9856e4838d6aa4864335a047b6b37a3273b191ef335bf0b2002e5c514ef261ffcda5a589fb084a48c336ffc4cdbab7f
+"zod@npm:^4.0.17":
+  version: 4.0.17
+  resolution: "zod@npm:4.0.17"
+  checksum: f88a1c6f6397282da517fbc1088a21c314aabad216c0ad6a3b60dbc52247430500a329fcd093e5fc5e80e1ff1c942a67a563d6a288ccabef1569e204c4eed4de
   languageName: node
   linkType: hard

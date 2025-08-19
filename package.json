@@ -15,12 +15,7 @@
     "ci": "CI=true yarn build && CI=true yarn test && yarn lint && tsc --noEmit"
   },
   "peerDependencies": {
-    "zod": "^3.0.0"
-  },
-  "peerDependenciesMeta": {
-    "zod": {
-      "optional": true
-    }
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.4.8",
@@ -35,7 +30,7 @@
     "prettier": "2.8.8",
     "typescript": "5.0.4",
     "vitest": "^0.31.3",
-    "zod": "^3.21.4"
+    "zod": "^4.0.17"
   },
   "amdName": "value-object",
   "main": "dist/value-object.js",
@@ -50,12 +45,6 @@
       "umd": "./dist/value-object.umd.js",
       "import": "./dist/value-object.mjs",
       "require": "./dist/value-object.js"
-    },
-    "./zod": {
-      "types": "./ist/index.d.ts",
-      "umd": "./dist/zod.umd.js",
-      "import": "./dist/zod.mjs",
-      "require": "./dist/zod.js"
     }
   }
 }
