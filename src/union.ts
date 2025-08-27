@@ -5,29 +5,33 @@ import {
   extractZodLiteralValueFromObjectSchema,
   once,
 } from './utils'
-type ValueObjectSchema<T> = T extends ValueObjectConstructor<string, infer Z>
+export type ValueObjectSchema<T> = T extends ValueObjectConstructor<
+  string,
+  infer Z
+>
   ? Z
   : T extends ValueObjectInstance<string, infer Z>
   ? Z
   : never
-type ValueObjectInst<T> = T extends ValueObjectConstructor<string, any>
+export type ValueObjectInst<T> = T extends ValueObjectConstructor<string, any>
   ? InstanceType<T>
   : T extends ValueObjectInstance<string, any>
   ? T
   : never
 
-type UnionInput<T extends Record<string, ValueObjectConstructor<string, any>>> =
-  {
-    [K in keyof T]: z.input<ValueObjectSchema<T[K]>> | ValueObjectInst<T[K]>
-  }[keyof T]
+export type UnionInput<
+  T extends Record<string, ValueObjectConstructor<string, any>>,
+> = {
+  [K in keyof T]: z.input<ValueObjectSchema<T[K]>> | ValueObjectInst<T[K]>
+}[keyof T]
 
-type UnionOutput<
+export type UnionOutput<
   T extends Record<string, ValueObjectConstructor<string, any>>,
 > = {
   [K in keyof T]: ValueObjectInst<T[K]>
 }[keyof T]
 
-interface ValueObjectUnion<
+export interface ValueObjectUnion<
   T extends Record<string, ValueObjectConstructor<string, any>>,
 > {
   schema(): z.ZodCustom<UnionOutput<T>, UnionInput<T>>
