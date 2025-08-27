@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 1.0.1
+
+### Patch Changes
+
+- 83ae1a3: Export types to enable use in other services
+
 ## 1.0.0
 
 ### Major Changes
