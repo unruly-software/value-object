@@ -36,7 +36,7 @@ export const RAW_SCHEMA_ACCESSOR_KEY = Symbol('RawSchemaKey')
 
 export function extractSchema<
   SCHEMA extends z.ZodAny,
-  T extends ValueObjectConstructor<string, SCHEMA>,
+  T extends ValueObjectConstructor<string, SCHEMA, any>,
 >(valueObject: T): SCHEMA {
   /** This field is not exposed */
   const ctor = valueObject as any

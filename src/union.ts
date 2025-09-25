@@ -7,32 +7,37 @@ import {
 } from './utils'
 export type ValueObjectSchema<T> = T extends ValueObjectConstructor<
   string,
-  infer Z
+  infer Z,
+  any
 >
   ? Z
-  : T extends ValueObjectInstance<string, infer Z>
+  : T extends ValueObjectInstance<string, infer Z, any>
   ? Z
   : never
-export type ValueObjectInst<T> = T extends ValueObjectConstructor<string, any>
+export type ValueObjectInst<T> = T extends ValueObjectConstructor<
+  string,
+  any,
+  any
+>
   ? InstanceType<T>
-  : T extends ValueObjectInstance<string, any>
+  : T extends ValueObjectInstance<string, any, any>
   ? T
   : never
 
 export type UnionInput<
-  T extends Record<string, ValueObjectConstructor<string, any>>,
+  T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > = {
   [K in keyof T]: z.input<ValueObjectSchema<T[K]>> | ValueObjectInst<T[K]>
 }[keyof T]
 
 export type UnionOutput<
-  T extends Record<string, ValueObjectConstructor<string, any>>,
+  T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > = {
   [K in keyof T]: ValueObjectInst<T[K]>
 }[keyof T]
 
 export interface ValueObjectUnion<
-  T extends Record<string, ValueObjectConstructor<string, any>>,
+  T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > {
   schema(): z.ZodCustom<UnionOutput<T>, UnionInput<T>>
 
@@ -46,7 +51,7 @@ export interface ValueObjectUnion<
 
 export function defineUnion<
   D extends string,
-  T extends Record<string, ValueObjectConstructor<string, any>>,
+  T extends Record<string, ValueObjectConstructor<string, any, any>>,
 >(discriminator: D, values: () => T): ValueObjectUnion<T> {
   const getValues = once(values)
 
