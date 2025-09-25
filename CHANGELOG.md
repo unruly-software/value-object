@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 1.1.0
+
+### Minor Changes
+
+- a4d8ab7: Add custom JSON serialization to ValueObject.define
+
 ## 1.0.1
 
 ### Patch Changes
