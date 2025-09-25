@@ -109,20 +109,6 @@ describe('ValueObject', () => {
         month: z.number(),
       })
     }) {
-
-      // static isoSchema() {
-      //   return z.string().pipe(z.transform((s) => {
-      //     const [year, month] = s.split('-').map(Number)
-      //     return {
-      //       year,
-      //       month,
-      //     }
-      //   })).pipe(YearMonth.schemaPrimitive())
-      // }
-
-      // static fromISO(isoString: string) {
-      //   return YearMonth.isoSchema().parse(isoString)
-      // }
     }
 
 
@@ -210,6 +196,87 @@ describe('ValueObject', () => {
       expectTypeOf<Parameters<typeof YearMonth.fromJSON>[0]>().toEqualTypeOf<{year: number, month: number} | YearMonth>()
       expectTypeOf<z.output<ReturnType<typeof YearMonth.schema>>>().toEqualTypeOf<YearMonth>()
       expectTypeOf<z.input<ReturnType<typeof YearMonth.schema>>>().toEqualTypeOf<{year: number, month: number} | YearMonth>()
+    })
+  })
+
+  describe('Value object with multiple primitive properties and a custom serializer', () => {
+    class YearMonth extends ValueObject.define({
+      id: 'YearMonth',
+      schema: () => z.object({
+        year: z.number(),
+        month: z.number(),
+      }).or(z.string().transform((str, ctx) => {
+        const [yearStr, monthStr] = str.split('-')
+        const year = parseInt(yearStr, 10)
+        const month = parseInt(monthStr, 10)
+        if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Invalid YearMonth format, expected "YYYY-MM"',
+          })
+          return z.NEVER
+        }
+        return {year, month}
+      })),
+      toJSON: (value) => `${value.year}-${value.month.toString().padStart(2, '0')}`
+    }) {
+    }
+
+    it('should allow creating from JSON', () => {
+      const ym = YearMonth.fromJSON({year: 2023, month: 10})
+      expect(ym.props).toEqual({year: 2023, month: 10})
+      expect(ym).toBeInstanceOf(YearMonth)
+      expect(JSON.stringify(ym)).toEqual('"2023-10"')
+      expect(ym.toJSON()).toEqual('2023-10')
+
+      const ym2 = YearMonth.fromJSON('2023-10')
+      expect(ym2.props).toEqual({year: 2023, month: 10})
+      expect(ym2).toBeInstanceOf(YearMonth)
+      expect(JSON.stringify(ym2)).toEqual('"2023-10"')
+      expect(ym2.toJSON()).toEqual('2023-10')
+    })
+
+    it('should not be referentially equal', () => {
+      const ym = {year: 2023, month: 10}
+      const a = YearMonth.fromJSON(ym)
+      const b = YearMonth.fromJSON(ym)
+      expect(a).not.toBe(b)
+      expect(a === b).toBe(false)
+      expect(a == b).toBe(false)
+    })
+
+    it('Should return itself when passed into the schema', () => {
+      const ym = YearMonth.fromJSON({year: 2023, month: 10})
+      const output = YearMonth.fromJSON(YearMonth.fromJSON(ym))
+      expect(ym).toBe(output)
+      expect(ym === output).toBe(true)
+    })
+
+    it('should serialize to string', () => {
+      const ym = YearMonth.fromJSON({year: 2023, month: 5})
+      expect(ym.toJSON()).toBe('2023-05')
+      expect(JSON.stringify(ym)).toBe('"2023-05"')
+    })
+
+    it('should pass type tests', () => {
+      const ym = YearMonth.fromJSON({year: 2023, month: 10})
+
+      expectTypeOf(ym.toJSON()).toEqualTypeOf<string>()
+      expectTypeOf(ym.props).toEqualTypeOf<{year: number, month: number}>()
+      expectTypeOf(ym).toEqualTypeOf<YearMonth>()
+
+      expectTypeOf<typeof YearMonth.fromJSON>().toBeFunction()
+      expectTypeOf<Parameters<typeof YearMonth.fromJSON>[0]>().toEqualTypeOf<{year: number, month: number} | string | YearMonth>()
+      expectTypeOf<z.output<ReturnType<typeof YearMonth.schema>>>().toEqualTypeOf<YearMonth>()
+      expectTypeOf<z.input<ReturnType<typeof YearMonth.schema>>>().toEqualTypeOf<{year: number, month: number} | string | YearMonth>()
+      expectTypeOf<ReturnType<YearMonth['toJSON']>>().toEqualTypeOf<string>()
+
+      expectTypeOf<ValueObject.inferJSON<YearMonth>>().toEqualTypeOf<string>()
+      expectTypeOf<ValueObject.inferProps<YearMonth>>().toEqualTypeOf<{year: number, month: number}>()
+      expectTypeOf<ValueObject.inferInput<YearMonth>>().toEqualTypeOf<{year: number, month: number} | string | YearMonth>()
+      expectTypeOf<ValueObject.inferJSON<typeof YearMonth>>().toEqualTypeOf<string>()
+      expectTypeOf<ValueObject.inferProps<typeof YearMonth>>().toEqualTypeOf<{year: number, month: number}>()
+      expectTypeOf<ValueObject.inferInput<typeof YearMonth>>().toEqualTypeOf<{year: number, month: number} | string | YearMonth>()
     })
   })
 
