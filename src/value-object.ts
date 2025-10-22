@@ -73,6 +73,8 @@ export interface ValueObjectConstructor<
     this: CTOR,
   ): z.ZodPipe<T, z.ZodTransform<InstanceType<CTOR>, T>>
 
+  schemaRaw<CTOR extends ValueObjectConstructor<ID, T, JS>>(this: CTOR): T
+
   fromJSON<CTOR extends ValueObjectConstructor<ID, T, JS>>(
     this: CTOR,
     props: z.input<T> | InstanceType<CTOR>,
@@ -120,6 +122,10 @@ export function define<
 
     static schemaPrimitive(this: ValueObjectConstructor<ID, T, JS>) {
       return schemaPrimitive(this)
+    }
+
+    static schemaRaw(this: ValueObjectConstructor<ID, T, JS>) {
+      return getSchema()
     }
 
     static fromJSON(
