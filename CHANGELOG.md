@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 1.1.1
+
+### Patch Changes
+
+- b6a7219: Add ValueObject.schemaRaw() helper
+
 ## 1.1.0
 
 ### Minor Changes
