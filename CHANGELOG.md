@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 1.2.0
+
+### Minor Changes
+
+- 0de2fa7: Improve documentation and testing
+
 ## 1.1.1
 
 ### Patch Changes
