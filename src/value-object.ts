@@ -5,9 +5,8 @@ import {
   instanceOrConstruct,
   once,
   recursivelyToJSON,
+  ValueObjectIdSymbol,
 } from './utils'
-
-export const ValueObjectIdSymbol = Symbol('ValueObjectId')
 
 export type inferJSON<T> = T extends ValueObjectConstructor<
   string,
@@ -107,7 +106,7 @@ export function define<
     })
   })
 
-  return class DefinedValueObject {
+  const DefinedValueObject = class {
     static [ValueObjectIdSymbol] = id
     static get [RAW_SCHEMA_ACCESSOR_KEY]() {
       return getSchema()
@@ -139,7 +138,9 @@ export function define<
       if (options.toJSON) {
         return recursivelyToJSON(options.toJSON(this.props))
       }
-      return recursivelyToJSON(this.props) as any
+      return recursivelyToJSON(this.props) as ToJSONOutput<JS>
     }
-  } as any
+  }
+
+  return DefinedValueObject as unknown as ValueObjectConstructor<ID, T, JS>
 }

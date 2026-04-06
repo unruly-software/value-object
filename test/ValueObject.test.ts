@@ -603,9 +603,24 @@ describe('ValueObject', () => {
       })
     }) {}
 
+    class Bird extends ValueObject.define({
+      id: 'Bird',
+      schema: () => z.object({
+        type: z.literal('bird'),
+        flies: z.boolean(),
+        species: z.string()
+      })
+    }) {}
+
     const Pets = ValueObject.defineUnion('type', () => ({
       cat: Cat,
       dog: Dog,
+    }))
+
+    const ExtendedPets = ValueObject.defineUnion('type', () => ({
+      cat: Cat,
+      dog: Dog,
+      bird: Bird,
     }))
 
     it('should parse', () => {
@@ -708,6 +723,100 @@ describe('ValueObject', () => {
       expectTypeOf<Parameters<typeof Pets.fromJSON>[0]>().toEqualTypeOf<{type: 'dog', woofs: boolean} | {type: 'cat', sharpClaws: boolean} | Dog | Cat>()
       expectTypeOf<z.output<ReturnType<typeof Pets.schema>>>().toEqualTypeOf<Dog | Cat>()
       expectTypeOf<z.input<ReturnType<typeof Pets.schema>>>().toEqualTypeOf<{type: 'dog', woofs: boolean} | {type: 'cat', sharpClaws: boolean} | Dog | Cat>()
+    })
+
+    it('should handle unions with more than 2 members', () => {
+      const bird = ExtendedPets.fromJSON({type: 'bird', flies: true, species: 'eagle'})
+      expect(bird).toBeInstanceOf(Bird)
+      expect(bird.props).toEqual({type: 'bird', flies: true, species: 'eagle'})
+
+      expect(ExtendedPets.isInstance('bird', bird)).toBe(true)
+      expect(ExtendedPets.isInstance('dog', bird)).toBe(false)
+      expect(ExtendedPets.isInstance('cat', bird)).toBe(false)
+    })
+
+    it('should handle nested value objects in union members', () => {
+      class Address extends ValueObject.define({
+        id: 'Address',
+        schema: () => z.object({
+          street: z.string(),
+          city: z.string()
+        })
+      }) {}
+
+      class PersonDog extends ValueObject.define({
+        id: 'PersonDog',
+        schema: () => z.object({
+          type: z.literal('person'),
+          name: z.string(),
+          address: Address.schema()
+        })
+      }) {}
+
+      class SimpleCat extends ValueObject.define({
+        id: 'SimpleCat',
+        schema: () => z.object({
+          type: z.literal('animal'),
+          species: z.literal('cat')
+        })
+      }) {}
+
+      const Beings = ValueObject.defineUnion('type', () => ({
+        person: PersonDog,
+        animal: SimpleCat
+      }))
+
+      const person = Beings.fromJSON({
+        type: 'person',
+        name: 'John',
+        address: {street: '123 Main St', city: 'Anytown'}
+      })
+
+      expect(person).toBeInstanceOf(PersonDog)
+      if (person.props.type === 'person') {
+        expect(person.props.address).toBeInstanceOf(Address)
+      } else {
+        expect.fail('Expected person to be of type "person"')
+      }
+    })
+
+    it('should throw error for unknown discriminator in isInstance', () => {
+      expect(() => Pets.isInstance('unknown' as any, new Dog({type: 'dog', woofs: true})))
+        .toThrow('No schema found for discriminator value "unknown"')
+    })
+
+    it('should handle complex error scenarios in union parsing', () => {
+      const result = ExtendedPets.schema().safeParse({
+        type: 'bird',
+        flies: 'not-boolean',
+        species: 123
+      })
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        const issues = result.error.issues
+        expect(issues.some(i => i.path.includes('flies'))).toBe(true)
+        expect(issues.some(i => i.path.includes('species'))).toBe(true)
+      }
+    })
+
+    it('should validate union factory is called only once', () => {
+      let factoryCalls = 0
+
+      const LazyUnion = ValueObject.defineUnion('type', () => {
+        factoryCalls++
+        return {
+          dog: Dog,
+          cat: Cat
+        }
+      })
+
+      LazyUnion.fromJSON({type: 'dog', woofs: true})
+      LazyUnion.fromJSON({type: 'cat', sharpClaws: false})
+      LazyUnion.schema()
+      LazyUnion.isInstance('dog', new Dog({type: 'dog', woofs: true}))
+
+      expect(factoryCalls).toBe(1)
     })
   })
 })

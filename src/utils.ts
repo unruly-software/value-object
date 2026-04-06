@@ -1,5 +1,7 @@
 import z from 'zod'
-import { ValueObjectConstructor, ValueObjectIdSymbol } from './value-object'
+
+export const ValueObjectIdSymbol = Symbol('ValueObjectId')
+export const RAW_SCHEMA_ACCESSOR_KEY = Symbol('RawSchemaKey')
 
 export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
   return z.any().transform((input, ctx) => {
@@ -10,11 +12,14 @@ export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
     const result = schema.safeParse(input)
     if (!result.success) {
       for (const issue of result.error.issues) {
+        const currentPath =
+          'path' in ctx && Array.isArray((ctx as any).path)
+            ? (ctx as any).path
+            : []
+
         ctx.addIssue({
           ...issue,
-          path: (ctx as any).path
-            ? [...(ctx as any).path, ...(issue.path ?? [])]
-            : issue.path,
+          path: [...currentPath, ...(issue.path ?? [])],
         })
       }
       return z.NEVER
@@ -32,28 +37,28 @@ export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
   })
 }
 
-export const RAW_SCHEMA_ACCESSOR_KEY = Symbol('RawSchemaKey')
-
-export function extractSchema<
-  SCHEMA extends z.ZodAny,
-  T extends ValueObjectConstructor<string, SCHEMA, any>,
->(valueObject: T): SCHEMA {
+export function extractSchema<SCHEMA extends z.ZodAny>(
+  valueObject: any,
+): SCHEMA {
   /** This field is not exposed */
   const ctor = valueObject as any
   if (!ctor[RAW_SCHEMA_ACCESSOR_KEY]) {
     throw new Error(
-      `ValueObject ${valueObject[ValueObjectIdSymbol]} does not have a raw schema defined.`,
+      `ValueObject ${
+        (valueObject as any)[ValueObjectIdSymbol]
+      } does not have a raw schema defined.`,
     )
   }
   return ctor[RAW_SCHEMA_ACCESSOR_KEY] as SCHEMA
 }
 
 export function extractZodLiteralValueFromObjectSchema(
-  schema: z.ZodAny,
+  schema: z.ZodSchema,
   key: string,
-) {
+): string {
   const s = schema as any as z.ZodObject<any>
-  if (s.def.type !== 'object') {
+
+  if (!s.shape || typeof s.shape !== 'object') {
     throw new Error(
       `Cannot extract ZodLiteral value from non-object schema at ${key}.`,
     )
@@ -118,6 +123,10 @@ export type ToJSONOutput<T> = T extends PrimitiveType
   : never
 
 export function recursivelyToJSON<T>(value: T): ToJSONOutput<T> {
+  if (value === null || value === undefined) {
+    return value as any
+  }
+
   const v: any = value
   if (isPrimitive(value)) {
     return v
@@ -126,14 +135,14 @@ export function recursivelyToJSON<T>(value: T): ToJSONOutput<T> {
     return v.map(recursivelyToJSON) as any
   }
 
-  if ('toJSON' in v && typeof v.toJSON === 'function') {
-    return recursivelyToJSON(v.toJSON())
-  }
-
   if (typeof v === 'object') {
+    if ('toJSON' in v && typeof v.toJSON === 'function') {
+      return recursivelyToJSON(v.toJSON())
+    }
+
     const result: any = {}
-    for (const key in value) {
-      result[key] = recursivelyToJSON(value[key])
+    for (const [key, nextValue] of Object.entries(v)) {
+      result[key] = recursivelyToJSON(nextValue)
     }
     return result
   }
