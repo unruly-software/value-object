@@ -76,9 +76,23 @@ export function defineUnion<
     validate()
     const types = Object.keys(getValues())
 
+    if (types.length === 0) {
+      throw new Error('Union must have at least one type')
+    }
+
+    const literalUnion =
+      types.length === 1
+        ? z.literal(types[0])
+        : z.union(
+            types.map((type) => z.literal(type)) as [
+              z.ZodLiteral<string>,
+              ...z.ZodLiteral<string>[],
+            ],
+          )
+
     return z
       .object({
-        [discriminator]: z.literal(types),
+        [discriminator]: literalUnion,
       })
       .transform((value) => value[discriminator] as string)
   })
@@ -108,11 +122,14 @@ export function defineUnion<
 
       const type = typeSchema.safeParse(value)
       if (!type.success) {
+        const currentPath =
+          'path' in ctx && Array.isArray((ctx as any).path)
+            ? (ctx as any).path
+            : []
+
         ctx.addIssue({
           code: 'custom',
-          path: (ctx as any).path
-            ? [...(ctx as any).path, ...[discriminator]]
-            : [discriminator],
+          path: [...currentPath, discriminator],
         })
         return z.NEVER
       }
@@ -122,11 +139,14 @@ export function defineUnion<
 
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
+          const currentPath =
+            'path' in ctx && Array.isArray((ctx as any).path)
+              ? (ctx as any).path
+              : []
+
           ctx.addIssue({
             ...issue,
-            path: (ctx as any).path
-              ? [...(ctx as any).path, ...(issue.path ?? [])]
-              : issue.path,
+            path: [...currentPath, ...(issue.path ?? [])],
           })
         }
         return z.NEVER
