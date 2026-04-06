@@ -58,7 +58,6 @@ export function extractZodLiteralValueFromObjectSchema(
 ): string {
   const s = schema as any as z.ZodObject<any>
 
-  // Basic type check with safer error message
   if (!s.shape || typeof s.shape !== 'object') {
     throw new Error(
       `Cannot extract ZodLiteral value from non-object schema at ${key}.`,
