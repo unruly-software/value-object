@@ -8,6 +8,12 @@ import {
   ValueObjectIdSymbol,
 } from './utils'
 
+/**
+ * Infers the serialized JSON shape of a value object (the return type of `toJSON()`).
+ *
+ * @example
+ * type EmailJSON = ValueObject.inferJSON<typeof Email> // string
+ */
 export type inferJSON<T> = T extends ValueObjectConstructor<
   string,
   any,
@@ -18,6 +24,12 @@ export type inferJSON<T> = T extends ValueObjectConstructor<
   ? JS
   : never
 
+/**
+ * Infers the parsed `props` shape of a value object (the schema's output type).
+ *
+ * @example
+ * type YearMonthProps = ValueObject.inferProps<typeof YearMonth> // { year: number, month: number }
+ */
 export type inferProps<T> = T extends ValueObjectConstructor<
   string,
   infer Z,
@@ -28,6 +40,12 @@ export type inferProps<T> = T extends ValueObjectConstructor<
   ? z.output<Z>
   : never
 
+/**
+ * Infers the accepted input type of a value object — either the raw schema input or an existing instance.
+ *
+ * @example
+ * type EmailInput = ValueObject.inferInput<typeof Email> // string | Email
+ */
 export type inferInput<T> = T extends ValueObjectConstructor<
   string,
   infer Z,
@@ -36,6 +54,16 @@ export type inferInput<T> = T extends ValueObjectConstructor<
   ? z.input<Z> | InstanceType<T>
   : T extends ValueObjectInstance<string, infer Z, any>
   ? z.input<Z> | T
+  : never
+
+export type inferRawInput<T> = T extends ValueObjectConstructor<
+  string,
+  infer Z,
+  any
+>
+  ? z.input<Z>
+  : T extends ValueObjectInstance<string, infer Z, any>
+  ? z.input<Z>
   : never
 
 export interface ValueObjectInstance<
@@ -79,9 +107,32 @@ export interface ValueObjectConstructor<
     props: z.input<T> | InstanceType<CTOR>,
   ): InstanceType<CTOR>
 
-  new (props: z.output<T>): ValueObjectInstance<ID, T, JS>
+  new(props: z.output<T>): ValueObjectInstance<ID, T, JS>
 }
 
+/**
+ * Creates a value object class backed by a Zod schema. Extend the returned class
+ * to add methods/getters. The class exposes `fromJSON`, `schema`, `schemaPrimitive`
+ * and `schemaRaw` statics, plus `props` and `toJSON()` on instances.
+ *
+ * @example
+ * class Email extends ValueObject.define({
+ *   id: 'Email',
+ *   schema: () => z.string().email(),
+ * }) {}
+ *
+ * const email = Email.fromJSON('value@object.com')
+ * email.props // 'value@object.com'
+ * email.toJSON() // 'value@object.com'
+ *
+ * @example
+ * // With a custom JSON serializer:
+ * class YearMonth extends ValueObject.define({
+ *   id: 'YearMonth',
+ *   schema: () => z.object({ year: z.number(), month: z.number() }),
+ *   toJSON: (v) => `${v.year}-${String(v.month).padStart(2, '0')}`,
+ * }) {}
+ */
 export function define<
   ID extends string,
   T extends z.ZodTypeAny,
@@ -91,7 +142,7 @@ export function define<
   schema: () => T
   toJSON?: (value: z.output<T>) => JS
 }): ValueObjectConstructor<ID, T, JS> {
-  const { id } = options
+  const {id} = options
   const getSchema = once(options.schema)
 
   const schema = once(function (klass: ValueObjectConstructor<ID, T, JS>) {

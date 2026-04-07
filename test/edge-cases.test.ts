@@ -102,14 +102,34 @@ describe('Edge Cases and Error Handling', () => {
       })
     }) {}
 
-    it('should throw error for mismatched discriminator values', () => {
-      // TODO: Can we make this a type error?
-      const MismatchedUnion = ValueObject.defineUnion('type', () => ({
+    it('should reject mismatched discriminator values at the type level', () => {
+      ValueObject.defineUnion('type', () => ({
+        // @ts-expect-error - Dog's discriminator literal is "dog", not "wrongKey"
         wrongKey: Dog,
-        cat: Cat
+        cat: Cat,
       }))
 
-      expect(() => MismatchedUnion.fromJSON({type: 'dog', woofs: true}))
+      ValueObject.defineUnion('type', () => ({
+        // @ts-expect-error - Cat's discriminator literal is "cat", not "dog"
+        dog: Cat,
+        // @ts-expect-error - Dog's discriminator literal is "dog", not "cat"
+        cat: Dog,
+      }))
+
+      ValueObject.defineUnion('type', () => ({
+        // @ts-expect-error - "spaghetti" is not a valid discriminator for Dog
+        spaghetti: Dog,
+        // @ts-expect-error - "bolognese" is not a valid discriminator for Cat
+        bolognese: Cat,
+      }))
+
+      // Runtime guard still rejects mismatches that bypass the type system.
+      const MismatchedUnion = ValueObject.defineUnion('type', () => ({
+        wrongKey: Dog,
+        cat: Cat,
+      }) as any)
+
+      expect(() => MismatchedUnion.fromJSON({type: 'dog', woofs: true} as any))
         .toThrow('Discriminator value mismatch for Dog: expected "wrongKey", got "dog"')
     })
 
@@ -177,6 +197,7 @@ describe('Edge Cases and Error Handling', () => {
 
       expect(() => {
         const BadUnion = ValueObject.defineUnion('type', () => ({
+          // @ts-expect-error - StringVO's schema is not an object with a discriminator field
           string: StringVO
         }))
         BadUnion.fromJSON('test')

@@ -1,10 +1,11 @@
 import z from 'zod'
-import { ValueObjectConstructor, ValueObjectInstance } from './value-object'
+import {ValueObjectConstructor, ValueObjectInstance} from './value-object'
 import {
   extractSchema,
   extractZodLiteralValueFromObjectSchema,
   once,
 } from './utils'
+
 export type ValueObjectSchema<T> = T extends ValueObjectConstructor<
   string,
   infer Z,
@@ -36,6 +37,28 @@ export type UnionOutput<
   [K in keyof T]: ValueObjectInst<T[K]>
 }[keyof T]
 
+type DiscriminatorOf<C, D extends string> = C extends ValueObjectConstructor<
+  string,
+  infer Z,
+  any
+>
+  ? z.output<Z> extends {[P in D]: infer V}
+  ? V
+  : never
+  : never
+
+type ValidatedUnionMembers<
+  D extends string,
+  T extends Record<string, ValueObjectConstructor<string, any, any>>,
+> = {
+    [K in keyof T]: K extends DiscriminatorOf<T[K], D>
+    ? unknown
+    : {
+      DISCRIMINATOR_MISMATCH: `Schema discriminator literal does not match key "${K &
+      string}"`
+    }
+  }
+
 export interface ValueObjectUnion<
   T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > {
@@ -49,17 +72,40 @@ export interface ValueObjectUnion<
   fromJSON(input: UnionInput<T>): UnionOutput<T>
 }
 
+/**
+ * Creates a discriminated union of value objects. Each member must use a
+ * `z.literal()` for the discriminator field, and the literal value must match
+ * the key in the values record.
+ *
+ * @example
+ * class Dog extends ValueObject.define({
+ *   id: 'Dog',
+ *   schema: () => z.object({ type: z.literal('dog'), woofs: z.boolean() }),
+ * }) {}
+ *
+ * class Cat extends ValueObject.define({
+ *   id: 'Cat',
+ *   schema: () => z.object({ type: z.literal('cat'), sharpClaws: z.boolean() }),
+ * }) {}
+ *
+ * const Pets = ValueObject.defineUnion('type', () => ({ dog: Dog, cat: Cat }))
+ *
+ * const pet = Pets.fromJSON({ type: 'dog', woofs: true }) // Dog | Cat
+ * if (Pets.isInstance('dog', pet)) pet.props.woofs
+ */
 export function defineUnion<
   D extends string,
   T extends Record<string, ValueObjectConstructor<string, any, any>>,
->(discriminator: D, values: () => T): ValueObjectUnion<T> {
+>(
+  discriminator: D,
+  values: () => T & ValidatedUnionMembers<D, T>,
+): ValueObjectUnion<T> {
   const getValues = once(values)
 
   const validate = once(() => {
     Object.entries(getValues()).forEach(([discriminatorValue, ctor]) => {
       const schema = extractSchema(ctor)
 
-      /** Ideally this would be enforced by the type system. */
       const instanceDiscriminator = extractZodLiteralValueFromObjectSchema(
         schema,
         discriminator,
@@ -84,11 +130,11 @@ export function defineUnion<
       types.length === 1
         ? z.literal(types[0])
         : z.union(
-            types.map((type) => z.literal(type)) as [
-              z.ZodLiteral<string>,
-              ...z.ZodLiteral<string>[],
-            ],
-          )
+          types.map((type) => z.literal(type)) as [
+            z.ZodLiteral<string>,
+            ...z.ZodLiteral<string>[],
+          ],
+        )
 
     return z
       .object({
