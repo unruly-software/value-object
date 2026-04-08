@@ -299,21 +299,18 @@ describe('Type Inference Tests', () => {
       })
     }) {}
 
-    const Pets = ValueObject.defineUnion('type', () => ({
-      dog: Dog,
-      cat: Cat
-    }))
+    const Pets = ValueObject.defineUnion('type', [Dog, Cat])
 
     it('should infer union output types', () => {
       const pet = Pets.fromJSON({type: 'dog', woofs: true})
 
       expectTypeOf(pet).toEqualTypeOf<Dog | Cat>()
-      expectTypeOf<ValueObject.UnionOutput<{dog: typeof Dog, cat: typeof Cat}>>()
+      expectTypeOf<ValueObject.UnionOutput<[typeof Dog, typeof Cat]>>()
         .toEqualTypeOf<Dog | Cat>()
     })
 
     it('should infer union input types', () => {
-      expectTypeOf<ValueObject.UnionInput<{dog: typeof Dog, cat: typeof Cat}>>()
+      expectTypeOf<ValueObject.UnionInput<[typeof Dog, typeof Cat]>>()
         .toEqualTypeOf<
           {type: 'dog', woofs: boolean} | Dog |
           {type: 'cat', meows: boolean} | Cat

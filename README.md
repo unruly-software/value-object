@@ -340,14 +340,11 @@ class Square extends ValueObject.define({
   }
 }
 
-const Shape = ValueObject.defineUnion('kind', () => ({
-  circle: Circle,
-  square: Square,
-}))
+const Shape = ValueObject.defineUnion('kind', [Circle, Square])
 
 const shape = Shape.fromJSON({ kind: 'circle', radius: 4 })
-shape instanceof Circle           // true
-Shape.isInstance('circle', shape) // true (with type narrowing)
+shape instanceof Circle          // true
+Shape.isInstance(Circle, shape)  // true (with type narrowing)
 
 // Use it inside any other Zod schema
 const drawingSchema = z.object({
@@ -356,7 +353,7 @@ const drawingSchema = z.object({
 })
 ```
 
-The discriminator literal on each member is checked against the key at the type level — keying `Circle` under anything other than `'circle'` is a compile-time error.
+The discriminator literal is read directly from each member's `z.literal(...)`, so members are passed as a plain array. `isInstance` narrows by constructor reference — typos become compile errors.
 
 ## Schema Methods
 
@@ -454,14 +451,14 @@ The schema's output type must remain assignable to the parent's output type, or 
 
 ### `ValueObject.defineUnion(discriminator, members)`
 
-Creates a discriminated union of value objects.
+Creates a discriminated union of value objects. Each member's schema must be a `z.object` with the `discriminator` field set to a `z.literal(...)`; the literal value is read directly from the schema.
 
-| Parameter       | Type                                       | Description                                        |
-| --------------- | ------------------------------------------ | -------------------------------------------------- |
-| `discriminator` | `string`                                   | Field name used to distinguish members             |
-| `members`       | `() => Record<string, ValueObjectClass>`   | Map of discriminator literal → member class        |
+| Parameter       | Type                                | Description                                          |
+| --------------- | ----------------------------------- | ---------------------------------------------------- |
+| `discriminator` | `string`                            | Field name used to distinguish members               |
+| `members`       | `readonly ValueObjectClass[]`       | Array of member classes                              |
 
-Returns an object with `fromJSON()`, `schema()`, and `isInstance()` methods.
+Returns an object with `fromJSON()`, `schema()`, and `isInstance(ctor, value)` methods. `isInstance` narrows the value to the given constructor's instance type.
 
 ### Instance members
 

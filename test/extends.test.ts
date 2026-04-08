@@ -231,10 +231,7 @@ describe('ValueObject.extends', () => {
         schema: (prev) => prev.refine((d) => d.age < 1, 'must be under 1 year'),
       }) {}
 
-      const Pets = ValueObject.defineUnion('type', () => ({
-        dog: Puppy,
-        cat: Cat,
-      }))
+      const Pets = ValueObject.defineUnion('type', [Puppy, Cat])
 
       // Parses through the *extended* validation: an old dog is rejected.
       const puppy = Pets.fromJSON({type: 'dog', age: 0.5, name: 'Rex'})
@@ -244,14 +241,6 @@ describe('ValueObject.extends', () => {
       expect(() =>
         Pets.fromJSON({type: 'dog', age: 5, name: 'Rex'}),
       ).toThrow(/must be under 1 year/)
-
-      // The discriminator validator on defineUnion uses the inherited 'dog'
-      // literal — keying Puppy under any other label is a type error.
-      ValueObject.defineUnion('type', () => ({
-        // @ts-expect-error - Puppy's discriminator literal is "dog", not "puppy"
-        puppy: Puppy,
-        cat: Cat,
-      }))
     })
 
     it('ValueObjectSchema<typeof GoogleEmail> resolves to the extended schema', () => {

@@ -584,16 +584,9 @@ describe('ValueObject', () => {
       })
     }) {}
 
-    const Pets = ValueObject.defineUnion('type', () => ({
-      cat: Cat,
-      dog: Dog,
-    }))
+    const Pets = ValueObject.defineUnion('type', [Cat, Dog])
 
-    const ExtendedPets = ValueObject.defineUnion('type', () => ({
-      cat: Cat,
-      dog: Dog,
-      bird: Bird,
-    }))
+    const ExtendedPets = ValueObject.defineUnion('type', [Cat, Dog, Bird])
 
     it('should parse', () => {
       const pet = Pets.fromJSON({type: 'dog', woofs: true})
@@ -601,10 +594,10 @@ describe('ValueObject', () => {
       expect(pet.props).toEqual({type: 'dog', woofs: true})
       expect(JSON.stringify(pet)).toEqual('{"type":"dog","woofs":true}')
       expect(pet.toJSON()).toEqual({type: 'dog', woofs: true})
-      if (!Pets.isInstance('dog', pet)) {
+      if (!Pets.isInstance(Dog, pet)) {
         expect.fail('Expected pet to be an instance of Dog')
       }
-      if (Pets.isInstance('cat', pet)) {
+      if (Pets.isInstance(Cat, pet)) {
         expect.fail('Expected pet to not be an instance of Cat')
       }
       expect(Pets.schema().parse(pet.toJSON())).toEqual(pet)
@@ -702,9 +695,9 @@ describe('ValueObject', () => {
       expect(bird).toBeInstanceOf(Bird)
       expect(bird.props).toEqual({type: 'bird', flies: true, species: 'eagle'})
 
-      expect(ExtendedPets.isInstance('bird', bird)).toBe(true)
-      expect(ExtendedPets.isInstance('dog', bird)).toBe(false)
-      expect(ExtendedPets.isInstance('cat', bird)).toBe(false)
+      expect(ExtendedPets.isInstance(Bird, bird)).toBe(true)
+      expect(ExtendedPets.isInstance(Dog, bird)).toBe(false)
+      expect(ExtendedPets.isInstance(Cat, bird)).toBe(false)
     })
 
     it('should handle nested value objects in union members', () => {
@@ -733,10 +726,7 @@ describe('ValueObject', () => {
         })
       }) {}
 
-      const Beings = ValueObject.defineUnion('type', () => ({
-        person: PersonDog,
-        animal: SimpleCat
-      }))
+      const Beings = ValueObject.defineUnion('type', [PersonDog, SimpleCat])
 
       const person = Beings.fromJSON({
         type: 'person',
@@ -750,11 +740,6 @@ describe('ValueObject', () => {
       } else {
         expect.fail('Expected person to be of type "person"')
       }
-    })
-
-    it('should throw error for unknown discriminator in isInstance', () => {
-      expect(() => Pets.isInstance('unknown' as any, new Dog({type: 'dog', woofs: true})))
-        .toThrow('No schema found for discriminator value "unknown"')
     })
 
     it('should handle complex error scenarios in union parsing', () => {
@@ -772,24 +757,6 @@ describe('ValueObject', () => {
       }
     })
 
-    it('should validate union factory is called only once', () => {
-      let factoryCalls = 0
-
-      const LazyUnion = ValueObject.defineUnion('type', () => {
-        factoryCalls++
-        return {
-          dog: Dog,
-          cat: Cat
-        }
-      })
-
-      LazyUnion.fromJSON({type: 'dog', woofs: true})
-      LazyUnion.fromJSON({type: 'cat', sharpClaws: false})
-      LazyUnion.schema()
-      LazyUnion.isInstance('dog', new Dog({type: 'dog', woofs: true}))
-
-      expect(factoryCalls).toBe(1)
-    })
   })
 
   describe('clone()', () => {
