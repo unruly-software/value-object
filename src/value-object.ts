@@ -1,5 +1,6 @@
 import z from 'zod'
 import {
+  DEFAULT_EQUALS_SYMBOL,
   RAW_SCHEMA_ACCESSOR_KEY,
   ToJSONOutput,
   deepEquals,
@@ -261,16 +262,7 @@ export function define<
     }
 
     equals(other: unknown): boolean {
-      if ((this as any) === other) return true
-      if (other === null || typeof other !== 'object') return false
-      if (!(ValueObjectIdSymbol in other)) return false
-      if (
-        (other as any)[ValueObjectIdSymbol] !==
-        (this as any)[ValueObjectIdSymbol]
-      ) {
-        return false
-      }
-      return deepEquals(this.props, (other as any).props)
+      return deepEquals(this, other)
     }
 
     clone(): ValueObjectInstance<ID, T, JS> {
@@ -283,6 +275,8 @@ export function define<
       return cloned
     }
   }
+
+  ;(DefinedValueObject.prototype.equals as any)[DEFAULT_EQUALS_SYMBOL] = true
 
   return DefinedValueObject as unknown as ValueObjectConstructor<ID, T, JS>
 }

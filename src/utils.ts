@@ -2,6 +2,11 @@ import z from 'zod'
 
 export const ValueObjectIdSymbol = Symbol('ValueObjectId')
 export const RAW_SCHEMA_ACCESSOR_KEY = Symbol('RawSchemaKey')
+/**
+ * Marker placed on the default `ValueObject#equals` (avoiding infinite
+ * recursion between `equals` and `deepEquals`).
+ */
+export const DEFAULT_EQUALS_SYMBOL = Symbol('defaultEquals')
 
 export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
   return z.any().transform((input, ctx) => {
@@ -123,7 +128,13 @@ export type ToJSONOutput<T> = T extends PrimitiveType
 
 /**
  * Deeply compares two values with the same semantics as `ValueObject#equals`.
- * Handles primitives, plain objects, arrays, dates, and value objects (delegating to their `equals`).
+ * Handles primitives, plain objects, arrays, dates, and value objects.
+ *
+ * For two value objects this checks that the IDs match and then deeply
+ * compares their `props`. If either side has overridden `equals` (i.e. the
+ * function is not the default marker-tagged implementation) the override is
+ * called instead so domain-specific identity is honoured even when the value
+ * object is nested inside another structure.
  */
 export function deepEquals(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
@@ -134,15 +145,34 @@ export function deepEquals(a: unknown, b: unknown): boolean {
   const bIsVO = ValueObjectIdSymbol in (b as object)
   if (aIsVO !== bIsVO) return false
   if (aIsVO) {
-    return (a as any).equals(b)
+    if ((a as any)[ValueObjectIdSymbol] !== (b as any)[ValueObjectIdSymbol]) {
+      return false
+    }
+    const aEquals = (a as any).equals
+    if (
+      typeof aEquals === 'function' &&
+      !(aEquals as any)[DEFAULT_EQUALS_SYMBOL]
+    ) {
+      return aEquals.call(a, b)
+    }
+    const bEquals = (b as any).equals
+    if (
+      typeof bEquals === 'function' &&
+      !(bEquals as any)[DEFAULT_EQUALS_SYMBOL]
+    ) {
+      return bEquals.call(b, a)
+    }
+    return deepEquals((a as any).props, (b as any).props)
   }
 
   if (a instanceof Date || b instanceof Date) {
     return a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
   }
 
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b)) return false
+  const aIsArray = Array.isArray(a)
+  const bIsArray = Array.isArray(b)
+  if (aIsArray || bIsArray) {
+    if (!aIsArray || !bIsArray) return false
     if (a.length !== b.length) return false
     for (let i = 0; i < a.length; i++) {
       if (!deepEquals(a[i], b[i])) return false

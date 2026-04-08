@@ -29,6 +29,30 @@ describe('ValueObject#equals', () => {
     })
   })
 
+  describe('null and undefined props', () => {
+    class UndefinedVO extends ValueObject.define({
+      id: 'UndefinedVO',
+      schema: () => z.object({field: z.undefined()}),
+    }) {}
+
+    class NullVO extends ValueObject.define({
+      id: 'NullVO',
+      schema: () => z.object({field: z.null()}),
+    }) {}
+
+    it('UndefinedVO instances are equal to each other', () => {
+      const a = UndefinedVO.fromJSON({field: undefined})
+      const b = UndefinedVO.fromJSON({field: undefined})
+      expect(a.equals(b)).toBe(true)
+    })
+
+    it('NullVO instances are equal to each other', () => {
+      const a = NullVO.fromJSON({field: null})
+      const b = NullVO.fromJSON({field: null})
+      expect(a.equals(b)).toBe(true)
+    })
+  })
+
   describe('Object-backed value objects', () => {
     class Address extends ValueObject.define({
       id: 'Address',
@@ -317,6 +341,178 @@ describe('ValueObject#equals', () => {
       expectTypeOf(User.prototype.equals)
         .parameter(0)
         .toEqualTypeOf<User>()
+    })
+  })
+
+  describe('deepEquals branch coverage via heterogeneous prop shapes', () => {
+    // Each pair below targets a specific branch in `deepEquals` that is hard
+    // to reach through the more "well-typed" tests above. The schemas use
+    // unions so the same value object can hold either side of a heterogeneous
+    // comparison.
+
+    it('returns false when one VO has a null prop and the other has an object prop', () => {
+      // Targets the `a === null` short-circuit reached via recursion (the
+      // top-level `equals` already guards `this`, so this branch only fires
+      // when deepEquals recurses into the props).
+      class MaybeData extends ValueObject.define({
+        id: 'MaybeData',
+        schema: () => z.union([z.null(), z.object({x: z.number()})]),
+      }) {}
+
+      const a = MaybeData.fromJSON(null)
+      const b = MaybeData.fromJSON({x: 1})
+      expect(a.equals(b)).toBe(false)
+      // And the symmetric direction (`b === null` branch).
+      expect(b.equals(a)).toBe(false)
+    })
+
+    it('returns false when one nested value is a value object and the other is a plain object', () => {
+      // Targets `aIsVO !== bIsVO` reached via recursion into props.
+      class Email extends ValueObject.define({
+        id: 'Email',
+        schema: () => z.string().email(),
+      }) {}
+
+      class Container extends ValueObject.define({
+        id: 'Container',
+        schema: () =>
+          z.object({
+            inner: z.union([
+              Email.schema(),
+              z.object({raw: z.string()}),
+            ]),
+          }),
+      }) {}
+
+      const a = Container.fromJSON({inner: 'alice@example.com'})
+      const b = Container.fromJSON({inner: {raw: 'alice@example.com'}})
+      expect(a.equals(b)).toBe(false)
+      expect(b.equals(a)).toBe(false)
+    })
+
+    it('returns false when comparing two VOs with different IDs but the same prop shape', () => {
+      // Targets the inline ID-mismatch branch in deepEquals.
+      class A extends ValueObject.define({
+        id: 'A',
+        schema: () => z.object({n: z.number()}),
+      }) {}
+      class B extends ValueObject.define({
+        id: 'B',
+        schema: () => z.object({n: z.number()}),
+      }) {}
+
+      const a = A.fromJSON({n: 1})
+      const b = B.fromJSON({n: 1}) as any
+      expect(a.equals(b)).toBe(false)
+    })
+
+    it('returns false when one prop is a Date and the other is a plain object', () => {
+      // Targets the Date-vs-non-Date branch in the Date check.
+      class WhenOrMeta extends ValueObject.define({
+        id: 'WhenOrMeta',
+        schema: () =>
+          z.object({
+            value: z.union([z.date(), z.object({y: z.number()})]),
+          }),
+      }) {}
+
+      const a = WhenOrMeta.fromJSON({value: new Date('2024-01-01T00:00:00Z')})
+      const b = WhenOrMeta.fromJSON({value: {y: 1}})
+      expect(a.equals(b)).toBe(false)
+      expect(b.equals(a)).toBe(false)
+    })
+
+    it('returns false when one prop is an array and the other is a plain object', () => {
+      // Targets the array-vs-non-array branch.
+      class ListOrMap extends ValueObject.define({
+        id: 'ListOrMap',
+        schema: () =>
+          z.object({
+            value: z.union([
+              z.array(z.string()),
+              z.object({k: z.string()}),
+            ]),
+          }),
+      }) {}
+
+      const a = ListOrMap.fromJSON({value: ['a', 'b']})
+      const b = ListOrMap.fromJSON({value: {k: 'a'}})
+      expect(a.equals(b)).toBe(false)
+      expect(b.equals(a)).toBe(false)
+    })
+
+    it('returns false when nested objects have a different number of keys', () => {
+      // Targets the `aKeys.length !== bKeys.length` branch on nested plain objects.
+      class WithOptional extends ValueObject.define({
+        id: 'WithOptional',
+        schema: () =>
+          z.object({
+            data: z.object({
+              a: z.string(),
+              b: z.string().optional(),
+            }),
+          }),
+      }) {}
+
+      const a = WithOptional.fromJSON({data: {a: 'x', b: 'y'}})
+      const b = WithOptional.fromJSON({data: {a: 'x'}})
+      expect(a.equals(b)).toBe(false)
+    })
+
+    it('returns false when nested objects have the same key count but different keys', () => {
+      // Targets the `hasOwnProperty(b, key)` branch where lengths match but
+      // a key from `a` is missing in `b`.
+      class TwoShapes extends ValueObject.define({
+        id: 'TwoShapes',
+        schema: () =>
+          z.object({
+            data: z.union([
+              z.object({x: z.string()}),
+              z.object({y: z.string()}),
+            ]),
+          }),
+      }) {}
+
+      const a = TwoShapes.fromJSON({data: {x: 'a'}})
+      const b = TwoShapes.fromJSON({data: {y: 'a'}})
+      expect(a.equals(b)).toBe(false)
+    })
+
+    it('honours an override that lives only on the right-hand operand', () => {
+      // Targets the `bEquals` override-detection branch in deepEquals. Both
+      // values must share the same VO id (so the inline ID check passes), but
+      // only the right-hand instance must carry an override — otherwise the
+      // `aEquals` branch fires first. We pin the override directly onto the
+      // single instance to engineer that asymmetry.
+      class Word extends ValueObject.define({
+        id: 'Word',
+        schema: () => z.string(),
+      }) {}
+
+      const a = Word.fromJSON('HELLO')
+      const b = Word.fromJSON('hello')
+
+      // Default equals is case-sensitive — sanity check the starting point.
+      expect(a.equals(b)).toBe(false)
+
+      // Pin a case-insensitive override on the `b` instance only.
+      ;(b as any).equals = function (other: Word) {
+        return this.props.toLowerCase() === other.props.toLowerCase()
+      }
+
+      // a.equals(b) → deepEquals(a, b) → a uses default → b's override fires.
+      expect(a.equals(b)).toBe(true)
+    })
+
+    it('comparing a value object to a primitive returns false', () => {
+      // Targets the `typeof b !== "object"` branch where `this` is an object.
+      class Email extends ValueObject.define({
+        id: 'Email',
+        schema: () => z.string().email(),
+      }) {}
+      const e = Email.fromJSON('alice@example.com')
+      expect((e.equals as any)(42)).toBe(false)
+      expect((e.equals as any)(true)).toBe(false)
     })
   })
 
