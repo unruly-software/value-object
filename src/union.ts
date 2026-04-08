@@ -186,14 +186,9 @@ export function defineUnion<
 
       const type = typeSchema.safeParse(value)
       if (!type.success) {
-        const currentPath =
-          'path' in ctx && Array.isArray((ctx as any).path)
-            ? (ctx as any).path
-            : []
-
         ctx.addIssue({
           code: 'custom',
-          path: [...currentPath, discriminator],
+          path: [discriminator],
         })
         return z.NEVER
       }
@@ -203,15 +198,7 @@ export function defineUnion<
 
       if (!parsed.success) {
         for (const issue of parsed.error.issues) {
-          const currentPath =
-            'path' in ctx && Array.isArray((ctx as any).path)
-              ? (ctx as any).path
-              : []
-
-          ctx.addIssue({
-            ...issue,
-            path: [...currentPath, ...(issue.path ?? [])],
-          })
+          ctx.addIssue({...issue})
         }
         return z.NEVER
       }

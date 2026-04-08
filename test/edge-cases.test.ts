@@ -189,6 +189,22 @@ describe('Edge Cases and Error Handling', () => {
       }).toThrow('Field "type" is not a ZodLiteral in the provided schema.')
     })
 
+    it('should throw when defining a union with no member types', () => {
+      const EmptyUnion = ValueObject.defineUnion('type', () => ({} as any))
+      expect(() => EmptyUnion.fromJSON({type: 'whatever'} as any)).toThrow(
+        'Union must have at least one type',
+      )
+    })
+
+    it('should support a union with a single member type', () => {
+      const Solo = ValueObject.defineUnion('type', () => ({dog: Dog}))
+      const parsed = Solo.fromJSON({type: 'dog', woofs: true})
+      expect(parsed).toBeInstanceOf(Dog)
+      // The non-matching discriminator path is also exercised so we're sure
+      // the single-literal branch produced a working schema.
+      expect(() => Solo.fromJSON({type: 'cat', meows: true} as any)).toThrow()
+    })
+
     it('should handle union with non-object schemas', () => {
       class StringVO extends ValueObject.define({
         id: 'StringVO',

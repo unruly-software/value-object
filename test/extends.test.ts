@@ -258,6 +258,13 @@ describe('ValueObject.extends', () => {
       type S = ValueObject.ValueObjectSchema<typeof GoogleEmail>
       expectTypeOf<z.output<S>>().toEqualTypeOf<string>()
     })
+
+    it('exposes schemaRaw() on the extended class', () => {
+      const raw = (GoogleEmail as any).schemaRaw()
+      // It is a Zod schema and rejects non-google emails (the extended rule).
+      expect(raw.safeParse('a@yahoo.com').success).toBe(false)
+      expect(raw.safeParse('a@google.com').success).toBe(true)
+    })
   })
 
   describe('Type-level constraint on schema transform output', () => {

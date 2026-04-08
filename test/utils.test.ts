@@ -162,6 +162,15 @@ describe('Utils', () => {
       expect(recursivelyToJSON(obj)).toEqual(obj)
     })
 
+    it('returns the value unchanged for non-object, non-primitive types', () => {
+      const fn = () => 'noop'
+      expect(recursivelyToJSON(fn as any)).toBe(fn)
+      const sym = Symbol('s')
+      expect(recursivelyToJSON(sym as any)).toBe(sym)
+      const big = BigInt(10)
+      expect(recursivelyToJSON(big as any)).toBe(big)
+    })
+
     it('should handle recursive toJSON calls', () => {
       const obj = {
         toJSON() {
@@ -265,6 +274,17 @@ describe('Utils', () => {
         'ZodLiteral value for field "type" must be a string.'
       )
     })
+
+    it('should throw error for ZodLiteral with multiple values', () => {
+      const schema = z.object({
+        type: z.literal(['dog', 'cat']),
+        name: z.string()
+      })
+
+      expect(() => extractZodLiteralValueFromObjectSchema(schema, 'type')).toThrow(
+        'ZodLiteral for field "type" must have exactly one value.'
+      )
+    })
   })
 
   describe('instanceOrConstruct()', () => {
@@ -305,6 +325,22 @@ describe('Utils', () => {
       const transformer = instanceOrConstruct(FailingVO, z.string())
 
       expect(() => transformer.parse('test')).toThrow()
+    })
+
+    it('should fall back to "Invalid input" when constructor throws a non-Error', () => {
+      class FailingNonError {
+        constructor() {
+          // eslint-disable-next-line @typescript-eslint/no-throw-literal
+          throw 'plain string failure'
+        }
+      }
+
+      const transformer = instanceOrConstruct(FailingNonError, z.string())
+      const result = transformer.safeParse('test')
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Invalid input')
+      }
     })
 
     it('should preserve error paths in nested contexts', () => {

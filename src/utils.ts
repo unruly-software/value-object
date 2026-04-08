@@ -17,15 +17,7 @@ export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
     const result = schema.safeParse(input)
     if (!result.success) {
       for (const issue of result.error.issues) {
-        const currentPath =
-          'path' in ctx && Array.isArray((ctx as any).path)
-            ? (ctx as any).path
-            : []
-
-        ctx.addIssue({
-          ...issue,
-          path: [...currentPath, ...(issue.path ?? [])],
-        })
+        ctx.addIssue({...issue})
       }
       return z.NEVER
     }
