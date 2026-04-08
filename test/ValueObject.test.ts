@@ -35,13 +35,6 @@ describe('ValueObject', () => {
       expect(email === output).toBe(true)
     })
 
-    /**
-     * This is primarily to help reduce the burden of writing custom equality
-     * checkers in tests. Most test frameworks will check that each value of an
-     * object and the prototype match instead of strict equality.
-     *
-     * Adding bound functions to the prototype will cause this to fail.
-     */
     it('should be equal according to vitests equality checker', () => {
       const email = 'value@object.com'
       const a = Email.fromJSON(email)
@@ -136,13 +129,6 @@ describe('ValueObject', () => {
       expect(ym === output).toBe(true)
     })
 
-    /**
-     * This is primarily to help reduce the burden of writing custom equality
-     * checkers in tests. Most test frameworks will check that each value of an
-     * object and the prototype match instead of strict equality.
-     *
-     * Adding bound functions to the prototype will cause this to fail.
-     */
     it('should be equal according to vitests equality checker', () => {
       const ym = {year: 2023, month: 10}
       const a = YearMonth.fromJSON(ym)
@@ -345,13 +331,6 @@ describe('ValueObject', () => {
       expect(user).toBe(output)
     })
 
-    /**
-     * This is primarily to help reduce the burden of writing custom equality
-     * checkers in tests. Most test frameworks will check that each value of an
-     * object and the prototype match instead of strict equality.
-     *
-     * Adding bound functions to the prototype will cause this to fail.
-     */
     it('should be equal according to vitests equality checker', () => {
       const user = {
         email: 'value@object.com',
@@ -526,13 +505,6 @@ describe('ValueObject', () => {
       expect(pet === output).toBe(true)
     })
 
-    /**
-     * This is primarily to help reduce the burden of writing custom equality
-     * checkers in tests. Most test frameworks will check that each value of an
-     * object and the prototype match instead of strict equality.
-     *
-     * Adding bound functions to the prototype will cause this to fail.
-     */
     it('should be equal according to vitests equality checker', () => {
       const pet = {type: 'dog' as const, woofs: true}
       const a = Pet.fromJSON(pet)
@@ -612,16 +584,9 @@ describe('ValueObject', () => {
       })
     }) {}
 
-    const Pets = ValueObject.defineUnion('type', () => ({
-      cat: Cat,
-      dog: Dog,
-    }))
+    const Pets = ValueObject.defineUnion('type', [Cat, Dog])
 
-    const ExtendedPets = ValueObject.defineUnion('type', () => ({
-      cat: Cat,
-      dog: Dog,
-      bird: Bird,
-    }))
+    const ExtendedPets = ValueObject.defineUnion('type', [Cat, Dog, Bird])
 
     it('should parse', () => {
       const pet = Pets.fromJSON({type: 'dog', woofs: true})
@@ -629,10 +594,10 @@ describe('ValueObject', () => {
       expect(pet.props).toEqual({type: 'dog', woofs: true})
       expect(JSON.stringify(pet)).toEqual('{"type":"dog","woofs":true}')
       expect(pet.toJSON()).toEqual({type: 'dog', woofs: true})
-      if (!Pets.isInstance('dog', pet)) {
+      if (!Pets.isInstance(Dog, pet)) {
         expect.fail('Expected pet to be an instance of Dog')
       }
-      if (Pets.isInstance('cat', pet)) {
+      if (Pets.isInstance(Cat, pet)) {
         expect.fail('Expected pet to not be an instance of Cat')
       }
       expect(Pets.schema().parse(pet.toJSON())).toEqual(pet)
@@ -730,9 +695,9 @@ describe('ValueObject', () => {
       expect(bird).toBeInstanceOf(Bird)
       expect(bird.props).toEqual({type: 'bird', flies: true, species: 'eagle'})
 
-      expect(ExtendedPets.isInstance('bird', bird)).toBe(true)
-      expect(ExtendedPets.isInstance('dog', bird)).toBe(false)
-      expect(ExtendedPets.isInstance('cat', bird)).toBe(false)
+      expect(ExtendedPets.isInstance(Bird, bird)).toBe(true)
+      expect(ExtendedPets.isInstance(Dog, bird)).toBe(false)
+      expect(ExtendedPets.isInstance(Cat, bird)).toBe(false)
     })
 
     it('should handle nested value objects in union members', () => {
@@ -761,10 +726,7 @@ describe('ValueObject', () => {
         })
       }) {}
 
-      const Beings = ValueObject.defineUnion('type', () => ({
-        person: PersonDog,
-        animal: SimpleCat
-      }))
+      const Beings = ValueObject.defineUnion('type', [PersonDog, SimpleCat])
 
       const person = Beings.fromJSON({
         type: 'person',
@@ -778,11 +740,6 @@ describe('ValueObject', () => {
       } else {
         expect.fail('Expected person to be of type "person"')
       }
-    })
-
-    it('should throw error for unknown discriminator in isInstance', () => {
-      expect(() => Pets.isInstance('unknown' as any, new Dog({type: 'dog', woofs: true})))
-        .toThrow('No schema found for discriminator value "unknown"')
     })
 
     it('should handle complex error scenarios in union parsing', () => {
@@ -800,23 +757,110 @@ describe('ValueObject', () => {
       }
     })
 
-    it('should validate union factory is called only once', () => {
-      let factoryCalls = 0
+  })
 
-      const LazyUnion = ValueObject.defineUnion('type', () => {
-        factoryCalls++
-        return {
-          dog: Dog,
-          cat: Cat
+  describe('clone()', () => {
+    it('should clone a primitive-backed value object', () => {
+      class Email extends ValueObject.define({
+        id: 'Email',
+        schema: () => z.string().email(),
+      }) {}
+
+      const a = Email.fromJSON('value@object.com')
+      const b = a.clone()
+
+      expect(b).not.toBe(a)
+      expect(b).toBeInstanceOf(Email)
+      expect(b.props).toEqual(a.props)
+      expect(a.equals(b)).toBe(true)
+    })
+
+    it('should deep-clone object props so mutating the clone does not affect the original', () => {
+      class Address extends ValueObject.define({
+        id: 'Address',
+        schema: () =>
+          z.object({
+            street: z.string(),
+            tags: z.array(z.string()),
+          }),
+      }) {}
+
+      const a = Address.fromJSON({street: '1 Main St', tags: ['home', 'primary']})
+      const b = a.clone()
+
+      expect(b).not.toBe(a)
+      expect(b.props).not.toBe(a.props)
+      expect(b.props.tags).not.toBe(a.props.tags)
+      expect(b.props).toEqual(a.props)
+
+      b.props.tags.push('mutated')
+      expect(a.props.tags).toEqual(['home', 'primary'])
+    })
+
+    it('should re-validate props through the schema when cloning', () => {
+      let parseCount = 0
+      class Counted extends ValueObject.define({
+        id: 'Counted',
+        schema: () =>
+          z.string().transform((v) => {
+            parseCount++
+            return v
+          }),
+      }) {}
+
+      const a = Counted.fromJSON('hello')
+      const before = parseCount
+      a.clone()
+      expect(parseCount).toBeGreaterThan(before)
+    })
+
+    it('should preserve methods/getters defined on subclasses and return the subclass type', () => {
+      class Email extends ValueObject.define({
+        id: 'Email',
+        schema: () => z.string().email(),
+      }) {
+        get domain() {
+          return this.props.split('@')[1]
         }
-      })
+      }
 
-      LazyUnion.fromJSON({type: 'dog', woofs: true})
-      LazyUnion.fromJSON({type: 'cat', sharpClaws: false})
-      LazyUnion.schema()
-      LazyUnion.isInstance('dog', new Dog({type: 'dog', woofs: true}))
+      const a = Email.fromJSON('alice@google.com')
+      const b = a.clone()
 
-      expect(factoryCalls).toBe(1)
+      expect(b).toBeInstanceOf(Email)
+      expect(b.domain).toBe('google.com')
+      expectTypeOf(b).toEqualTypeOf<Email>()
+    })
+
+    it('should clone instances created via ValueObject.extend and return the extended type', () => {
+      class Email extends ValueObject.define({
+        id: 'Email',
+        schema: () => z.string().email(),
+      }) {
+        get domain() {
+          return this.props.split('@')[1]
+        }
+      }
+
+      class GoogleEmail extends ValueObject.extend(Email, {
+        id: 'GoogleEmail',
+        schema: (prev) =>
+          prev.refine((s) => s.endsWith('@google.com'), 'must be a google email'),
+      }) {
+        get isWorkspace() {
+          return this.props.endsWith('@workspace.google.com')
+        }
+      }
+
+      const a = GoogleEmail.fromJSON('alice@google.com')
+      const b = a.clone()
+
+      expect(b).not.toBe(a)
+      expect(b).toBeInstanceOf(GoogleEmail)
+      expect(b).toBeInstanceOf(Email)
+      expect(b.domain).toBe('google.com')
+      expect(b.isWorkspace).toBe(false)
+      expect(a.equals(b)).toBe(true)
     })
   })
 })

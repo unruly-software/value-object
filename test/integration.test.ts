@@ -73,11 +73,11 @@ describe('Integration Tests - Real-world Scenarios', () => {
       })
     }) {}
 
-    const ProductVariant = ValueObject.defineUnion('type', () => ({
-      physical: PhysicalProduct,
-      digital: DigitalProduct,
-      service: ServiceProduct
-    }))
+    const ProductVariant = ValueObject.defineUnion('type', [
+      PhysicalProduct,
+      DigitalProduct,
+      ServiceProduct,
+    ])
 
     // Complex entities with nested value objects
     class Product extends ValueObject.define({
@@ -396,10 +396,10 @@ describe('Integration Tests - Real-world Scenarios', () => {
       })
     }) {}
 
-    const DomainEvent = ValueObject.defineUnion('type', () => ({
-      user_registered: UserRegistered,
-      order_placed: OrderPlaced
-    }))
+    const DomainEvent = ValueObject.defineUnion('type', [
+      UserRegistered,
+      OrderPlaced,
+    ])
 
     class EventStore extends ValueObject.define({
       id: 'EventStore',
@@ -480,10 +480,7 @@ describe('Integration Tests - Real-world Scenarios', () => {
       })
     }) {}
 
-    const ApiResponse = ValueObject.defineUnion('status', () => ({
-      success: ApiSuccess,
-      error: ApiError
-    }))
+    const ApiResponse = ValueObject.defineUnion('status', [ApiSuccess, ApiError])
 
     it('should model API responses with proper discrimination', () => {
       const successResponse = ApiResponse.fromJSON({

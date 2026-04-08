@@ -102,22 +102,23 @@ describe('Edge Cases and Error Handling', () => {
       })
     }) {}
 
-    it('should throw error for mismatched discriminator values', () => {
-      // TODO: Can we make this a type error?
-      const MismatchedUnion = ValueObject.defineUnion('type', () => ({
-        wrongKey: Dog,
-        cat: Cat
-      }))
+    it('should throw at runtime when two members share a discriminator literal', () => {
+      class DogTwin extends ValueObject.define({
+        id: 'DogTwin',
+        schema: () => z.object({
+          type: z.literal('dog'),
+          name: z.string()
+        })
+      }) {}
 
-      expect(() => MismatchedUnion.fromJSON({type: 'dog', woofs: true}))
-        .toThrow('Discriminator value mismatch for Dog: expected "wrongKey", got "dog"')
+      const Dupes = ValueObject.defineUnion('type', [Dog, DogTwin])
+      expect(() => Dupes.fromJSON({type: 'dog', woofs: true})).toThrow(
+        'Duplicate discriminator value "dog" in union for "type"',
+      )
     })
 
     it('should handle invalid discriminator values in union', () => {
-      const Pets = ValueObject.defineUnion('type', () => ({
-        dog: Dog,
-        cat: Cat
-      }))
+      const Pets = ValueObject.defineUnion('type', [Dog, Cat])
 
       expect(() => Pets.fromJSON({type: 'bird', flies: true} as any))
         .toThrowErrorMatchingInlineSnapshot(`
@@ -134,10 +135,7 @@ describe('Edge Cases and Error Handling', () => {
     })
 
     it('should handle missing discriminator field', () => {
-      const Pets = ValueObject.defineUnion('type', () => ({
-        dog: Dog,
-        cat: Cat
-      }))
+      const Pets = ValueObject.defineUnion('type', [Dog, Cat])
 
       expect(() => Pets.fromJSON({woofs: true} as any)).toThrowErrorMatchingInlineSnapshot(`
         "[
@@ -162,11 +160,25 @@ describe('Edge Cases and Error Handling', () => {
       }) {}
 
       expect(() => {
-        const BadUnion = ValueObject.defineUnion('type', () => ({
-          invalid: InvalidVO
-        }))
-        BadUnion.fromJSON({type: 'invalid', value: 'test'})
+        const BadUnion = ValueObject.defineUnion('type', [InvalidVO])
+        BadUnion.fromJSON({type: 'invalid', value: 'test'} as any)
       }).toThrow('Field "type" is not a ZodLiteral in the provided schema.')
+    })
+
+    it('should throw when defining a union with no member types', () => {
+      const EmptyUnion = ValueObject.defineUnion('type', [] as const) as any
+      expect(() => EmptyUnion.fromJSON({type: 'whatever'})).toThrow(
+        'Union must have at least one type',
+      )
+    })
+
+    it('should support a union with a single member type', () => {
+      const Solo = ValueObject.defineUnion('type', [Dog])
+      const parsed = Solo.fromJSON({type: 'dog', woofs: true})
+      expect(parsed).toBeInstanceOf(Dog)
+      // The non-matching discriminator path is also exercised so we're sure
+      // the single-literal branch produced a working schema.
+      expect(() => Solo.fromJSON({type: 'cat', meows: true} as any)).toThrow()
     })
 
     it('should handle union with non-object schemas', () => {
@@ -176,10 +188,8 @@ describe('Edge Cases and Error Handling', () => {
       }) {}
 
       expect(() => {
-        const BadUnion = ValueObject.defineUnion('type', () => ({
-          string: StringVO
-        }))
-        BadUnion.fromJSON('test')
+        const BadUnion = ValueObject.defineUnion('type', [StringVO])
+        BadUnion.fromJSON('test' as any)
       }).toThrow('Cannot extract ZodLiteral value from non-object schema at type.')
     })
   })
