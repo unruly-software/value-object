@@ -1,5 +1,5 @@
 import z from 'zod'
-import {ValueObjectConstructor, ValueObjectInstance} from './value-object'
+import { ValueObjectConstructor, ValueObjectInstance } from './value-object'
 import {
   extractSchema,
   extractZodLiteralValueFromObjectSchema,
@@ -42,22 +42,22 @@ type DiscriminatorOf<C, D extends string> = C extends ValueObjectConstructor<
   infer Z,
   any
 >
-  ? z.output<Z> extends {[P in D]: infer V}
-  ? V
-  : never
+  ? z.output<Z> extends { [P in D]: infer V }
+    ? V
+    : never
   : never
 
 type ValidatedUnionMembers<
   D extends string,
   T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > = {
-    [K in keyof T]: K extends DiscriminatorOf<T[K], D>
+  [K in keyof T]: K extends DiscriminatorOf<T[K], D>
     ? unknown
     : {
-      DISCRIMINATOR_MISMATCH: `Schema discriminator literal does not match key "${K &
-      string}"`
-    }
-  }
+        DISCRIMINATOR_MISMATCH: `Schema discriminator literal does not match key "${K &
+          string}"`
+      }
+}
 
 export interface ValueObjectUnion<
   T extends Record<string, ValueObjectConstructor<string, any, any>>,
@@ -130,11 +130,11 @@ export function defineUnion<
       types.length === 1
         ? z.literal(types[0])
         : z.union(
-          types.map((type) => z.literal(type)) as [
-            z.ZodLiteral<string>,
-            ...z.ZodLiteral<string>[],
-          ],
-        )
+            types.map((type) => z.literal(type)) as [
+              z.ZodLiteral<string>,
+              ...z.ZodLiteral<string>[],
+            ],
+          )
 
     return z
       .object({
