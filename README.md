@@ -40,6 +40,7 @@ JSON.stringify({ email })   // '{"email":"alice@example.com"}'
   - [Custom JSON serialization](#custom-json-serialization)
   - [Composing value objects](#composing-value-objects)
   - [Structural equality](#structural-equality)
+  - [Cloning](#cloning)
   - [Extending a value object](#extending-a-value-object)
   - [Discriminated unions](#discriminated-unions)
 - [Schema Methods](#schema-methods)
@@ -244,6 +245,22 @@ const b = User.fromJSON({ id, name: 'Alice Renamed', updatedAt: '2024-12-31' })
 a.equals(b) // true — User identity is the id, not the snapshot
 ```
 
+### Cloning
+
+`clone()` returns a duplicate instance by re-parsing `props` through the underlying Zod schema, so nested objects and arrays are deep-cloned automatically. The returned instance is of the same class — including subclasses created via `ValueObject.extends()`.
+
+```typescript
+const a = Address.fromJSON({ street: '1 Main St', tags: ['home', 'primary'] })
+const b = a.clone()
+
+b === a            // false — fresh instance
+a.equals(b)        // true  — same data
+b.props !== a.props // true — props are deep-cloned, not shared
+
+b.props.tags.push('mutated')
+a.props.tags        // ['home', 'primary'] — original is untouched
+```
+
 ### Extending a value object
 
 `ValueObject.extends()` derives a new class from an existing one and layers a refined schema on top. The prototype chain is preserved, so `instanceof` and inherited methods continue to work, and the new schema receives the parent's schema as its first argument.
@@ -401,12 +418,10 @@ This library sits in the small intersection of "schema validation" and "class-ba
 | [Valibot](https://valibot.dev)         | Functional, tree-shakable   | No              | n/a — plain objects                   | Plain object out, no methods         |
 | [io-ts](https://github.com/gcanti/io-ts) | Functional codecs (`fp-ts`) | No              | n/a — combinators only                | Plain object out, no methods         |
 | [runtypes](https://github.com/runtypes/runtypes) | Functional combinators      | No              | n/a — `.withConstraint`, `.withBrand` | Plain object out, no methods         |
-| [type-fest `Tagged`](https://github.com/sindresorhus/type-fest) | Type-level brand only       | No              | n/a — types only                      | Trivial — value is the primitive     |
 
 A few notes on where the trade-offs sit:
 
 - **Functional codec libraries** (Valibot, io-ts, runtypes) are excellent for pure validation but produce plain objects. There is nowhere natural to attach `email.domain`, `money.add()`, or `address.formatted` — that behaviour ends up in free functions, away from the data.
-- **`type-fest`-style branding** is the lightest possible option but provides no runtime validation; you're responsible for parsing the value into the branded type yourself.
 - **`class-validator` / `class-transformer`** is the established decorator-based approach. It supports inheritance and rich validation, but it depends on `reflect-metadata`, requires `experimentalDecorators`, and round-tripping through JSON is a two-step process: `instanceToPlain` before `JSON.stringify` and `plainToInstance` after `JSON.parse`.
 - **`zod-class`** is the closest direct comparison: it also wraps Zod in a class with `.extend(...)` for adding fields. It is missing a few key features: no custom `toJSON` option, no separate schema for primitive input, and the `.extend()` method creates a new class that doesn't preserve the prototype chain (so `instanceof` checks and inherited methods don't work).
 - **Effect Schema** has a powerful `Schema.Class` API and integrates with the rest of the Effect ecosystem (equality, hashing, etc.). It uses explicit encode/decode transformations for serialization rather than the implicit `toJSON()` convention, and brings the Effect runtime as a dependency.
@@ -455,6 +470,7 @@ Returns an object with `fromJSON()`, `schema()`, and `isInstance()` methods.
 | `props`           | The validated, readonly data                                                      |
 | `toJSON()`        | JSON-compatible representation (respects custom `toJSON` option)                  |
 | `equals(other)`   | Structural equality with deep, key-order-independent comparison; override-friendly |
+| `clone()`         | Deep-cloned duplicate instance of the same class (re-parses `props` through the schema) |
 
 ### Static members
 

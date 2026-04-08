@@ -62,13 +62,31 @@ type ValidatedUnionMembers<
 export interface ValueObjectUnion<
   T extends Record<string, ValueObjectConstructor<string, any, any>>,
 > {
+  /**
+   * Zod schema for the union; accepts any member's input or instance and returns the matching instance.
+   *
+   * @example
+   * z.object({ pet: Pets.schema() }).parse({ pet: { type: 'dog', woofs: true } })
+   */
   schema(): z.ZodCustom<UnionOutput<T>, UnionInput<T>>
 
+  /**
+   * Type guard for a specific member of the union.
+   *
+   * @example
+   * if (Pets.isInstance('dog', pet)) pet.props.woofs
+   */
   isInstance<K extends keyof T>(
     discriminator: K,
     value: unknown,
   ): value is ValueObjectInst<T[K]>
 
+  /**
+   * Parses raw input into the matching member instance.
+   *
+   * @example
+   * const pet = Pets.fromJSON({ type: 'cat', sharpClaws: false }) // Cat
+   */
   fromJSON(input: UnionInput<T>): UnionOutput<T>
 }
 

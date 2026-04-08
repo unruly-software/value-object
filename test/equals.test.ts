@@ -140,8 +140,7 @@ describe('ValueObject#equals', () => {
       // Direct comparison goes through the override.
       expect(a.props.email.equals(b.props.email)).toBe(true)
 
-      // And so does the parent comparison, because deepEquals dispatches to
-      // the inner equals() rather than comparing the strings itself.
+      // Parent comparison cascades through the inner override.
       expect(a.equals(b)).toBe(true)
     })
   })

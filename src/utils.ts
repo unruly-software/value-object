@@ -40,7 +40,6 @@ export function instanceOrConstruct(klass: any, schema: z.ZodType<any>) {
 export function extractSchema<SCHEMA extends z.ZodAny>(
   valueObject: any,
 ): SCHEMA {
-  /** This field is not exposed */
   const ctor = valueObject as any
   if (!ctor[RAW_SCHEMA_ACCESSOR_KEY]) {
     throw new Error(
@@ -123,19 +122,8 @@ export type ToJSONOutput<T> = T extends PrimitiveType
   : never
 
 /**
- * Deeply compares two arbitrary values, with semantics that match the
- * `equals()` method on `ValueObject` instances:
- *
- * - Identical references (and `Object.is`-equal primitives) compare equal.
- * - When either side is a value object instance (carries `ValueObjectIdSymbol`)
- *   the comparison is delegated to that instance's `equals()` method, so
- *   user-defined overrides are honoured.
- * - `Date` instances compare by their numeric time.
- * - Arrays must have the same length and equal elements *in order*.
- * - Plain objects are compared by their own enumerable keys, in any order.
- * - Anything else (Map, Set, RegExp, class instances, functions) falls back
- *   to reference equality. If you need richer semantics, override `equals`
- *   on the value object that owns the field.
+ * Deeply compares two values with the same semantics as `ValueObject#equals`.
+ * Handles primitives, plain objects, arrays, dates, and value objects (delegating to their `equals`).
  */
 export function deepEquals(a: unknown, b: unknown): boolean {
   if (Object.is(a, b)) return true
@@ -146,8 +134,6 @@ export function deepEquals(a: unknown, b: unknown): boolean {
   const bIsVO = ValueObjectIdSymbol in (b as object)
   if (aIsVO !== bIsVO) return false
   if (aIsVO) {
-    // Delegate fully to the VO's own `equals` method so user overrides win.
-    // The default implementation handles the ID check internally.
     return (a as any).equals(b)
   }
 

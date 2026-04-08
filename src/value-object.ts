@@ -57,6 +57,12 @@ export type inferInput<T> = T extends ValueObjectConstructor<
   ? z.input<Z> | T
   : never
 
+/**
+ * Infers the raw schema input — the same as `inferInput<T>` but excluding the instance type.
+ *
+ * @example
+ * type EmailRaw = ValueObject.inferRawInput<typeof Email> // string
+ */
 export type inferRawInput<T> = T extends ValueObjectConstructor<
   string,
   infer Z,
@@ -78,22 +84,40 @@ export interface ValueObjectInstance<
 
   readonly __schema: T
 
+  /**
+   * JSON-compatible representation of the value object. Honours the optional
+   * `toJSON` serializer passed to `define()` / `extend()`.
+   *
+   * @example
+   * Email.fromJSON('alice@example.com').toJSON() // 'alice@example.com'
+   */
   toJSON(): ToJSONOutput<JS>
 
   /**
-   * Structural equality. Returns `true` only when `other` is a value object
-   * of the same type (matching `id`) whose `props` are deeply equal:
+   * Structural equality — same type and deeply-equal `props`. Override on a
+   * subclass to express domain-specific identity (e.g. comparing only `id`).
    *
-   * - Object keys are compared in any order, recursively.
-   * - Arrays must have the same length and equal elements in order.
-   * - Nested value objects are compared via their own `equals()` method, so
-   *   user overrides are honoured all the way down.
-   * - `Date` instances compare by timestamp.
-   *
-   * Subclasses may override this with `override equals(other: Self): boolean`
-   * to express domain-specific identity (e.g. comparing only an `id` field).
+   * @example
+   * class User extends ValueObject.define({
+   *   id: 'User',
+   *   schema: () => z.object({ id: z.string(), name: z.string() }),
+   * }) {
+   *   override equals(other: User) { return this.props.id === other.props.id }
+   * }
    */
   equals(other: this): boolean
+
+  /**
+   * Returns a duplicate instance by re-parsing `props` through the schema
+   * (Zod handles deep cloning) and constructing a new instance of the same class.
+   *
+   * @example
+   * const a = Address.fromJSON({ street: '1 Main St', tags: ['home'] })
+   * const b = a.clone()
+   * b.props.tags.push('mutated')
+   * a.props.tags // ['home'] — original is untouched
+   */
+  clone(): this
 }
 
 export interface ValueObjectConstructor<
@@ -103,6 +127,14 @@ export interface ValueObjectConstructor<
 > {
   [ValueObjectIdSymbol]: ID
 
+  /**
+   * Zod schema accepting either a raw input or an existing instance, returning
+   * an instance. Use this when composing the value object inside other Zod schemas.
+   *
+   * @example
+   * const Form = z.object({ email: Email.schema() })
+   * Form.parse({ email: 'a@b.com' }).email instanceof Email // true
+   */
   schema<CTOR extends ValueObjectConstructor<ID, T, JS>>(
     this: CTOR,
   ): z.ZodUnion<
@@ -112,12 +144,32 @@ export interface ValueObjectConstructor<
     ]
   >
 
+  /**
+   * Zod schema accepting only the raw primitive input (not an instance),
+   * returning an instance. Useful when parsing JSON from the wire.
+   *
+   * @example
+   * Email.schemaPrimitive().parse('a@b.com') instanceof Email // true
+   */
   schemaPrimitive<CTOR extends ValueObjectConstructor<ID, T, JS>>(
     this: CTOR,
   ): z.ZodPipe<T, z.ZodTransform<InstanceType<CTOR>, T>>
 
+  /**
+   * The raw underlying Zod schema with no instance wrapping.
+   *
+   * @example
+   * Email.schemaRaw().parse('a@b.com') // 'a@b.com' (string, not Email)
+   */
   schemaRaw<CTOR extends ValueObjectConstructor<ID, T, JS>>(this: CTOR): T
 
+  /**
+   * Parses a raw input (or accepts an existing instance) and returns a validated instance.
+   *
+   * @example
+   * const email = Email.fromJSON('a@b.com')
+   * Email.fromJSON(email) === email // true — instances pass through
+   */
   fromJSON<CTOR extends ValueObjectConstructor<ID, T, JS>>(
     this: CTOR,
     props: z.input<T> | InstanceType<CTOR>,
@@ -220,26 +272,27 @@ export function define<
       }
       return deepEquals(this.props, (other as any).props)
     }
+
+    clone(): ValueObjectInstance<ID, T, JS> {
+      const Ctor = this.constructor as new (
+        props: z.output<T>,
+      ) => ValueObjectInstance<ID, T, JS>
+      const cloned = (
+        Ctor as unknown as ValueObjectConstructor<ID, T, JS>
+      ).fromJSON(this.props as any)
+      return cloned
+    }
   }
 
   return DefinedValueObject as unknown as ValueObjectConstructor<ID, T, JS>
 }
 
-/**
- * Extracts the Zod schema type from a value object constructor.
- * Local copy of the helper in `./union` to avoid a cross-file import.
- */
+/** Extracts the Zod schema type from a value object constructor. */
 type SchemaOf<P> = P extends ValueObjectConstructor<string, infer Z, any>
   ? Z
   : never
 
-/**
- * The user-defined methods/getters on a parent value object class — i.e.
- * everything other than the structural members of `ValueObjectInstance`.
- * Stripping by `keyof ValueObjectInstance<...>` removes `props`, `toJSON`,
- * `__schema`, and `[ValueObjectIdSymbol]` in one go so they can be
- * re-supplied with the extended types.
- */
+/** Methods/getters defined on the parent class, excluding structural members. */
 type ParentExtras<P> = Omit<
   InstanceType<P & (new (...args: any[]) => any)>,
   keyof ValueObjectInstance<string, z.ZodTypeAny, unknown>
@@ -252,14 +305,7 @@ type ExtendedInstance<
   NewJS,
 > = ParentExtras<P> & ValueObjectInstance<ID, NewT, NewJS>
 
-/**
- * A mapped type over `keyof T` which strips construct/call signatures —
- * leaving only the named static members. We use it so we can re-attach a
- * single, more specific `new()` signature without TypeScript treating it as
- * an overload of the parent's constructor (which would otherwise trigger
- * "Base constructors must all have the same return type" when the result is
- * used in a `class X extends ...` clause).
- */
+/** Strips construct/call signatures from a type, leaving only named static members. */
 type StaticsOf<T> = { [K in keyof T]: T[K] }
 
 export type ExtendedValueObjectConstructor<
@@ -272,10 +318,8 @@ export type ExtendedValueObjectConstructor<
 }
 
 /**
- * Sentinel returned (in place of the extended constructor) when the schema
- * transform produces a type that is *not* assignable to the parent's output.
- * It is intentionally not constructable, so `class X extends extend(...) {}`
- * fails to type-check on the offending call.
+ * Returned when an `extend` schema produces an output not assignable to the parent's.
+ * Not constructable, so misuse fails to type-check at the `class X extends ...` site.
  */
 export type SchemaTransformOutputMismatchError = {
   __valueObjectError: 'Schema transform output must be assignable to the parent schema output'
