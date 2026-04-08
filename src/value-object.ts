@@ -2,6 +2,7 @@ import z from 'zod'
 import {
   RAW_SCHEMA_ACCESSOR_KEY,
   ToJSONOutput,
+  deepEquals,
   instanceOrConstruct,
   once,
   recursivelyToJSON,
@@ -78,6 +79,21 @@ export interface ValueObjectInstance<
   readonly __schema: T
 
   toJSON(): ToJSONOutput<JS>
+
+  /**
+   * Structural equality. Returns `true` only when `other` is a value object
+   * of the same type (matching `id`) whose `props` are deeply equal:
+   *
+   * - Object keys are compared in any order, recursively.
+   * - Arrays must have the same length and equal elements in order.
+   * - Nested value objects are compared via their own `equals()` method, so
+   *   user overrides are honoured all the way down.
+   * - `Date` instances compare by timestamp.
+   *
+   * Subclasses may override this with `override equals(other: Self): boolean`
+   * to express domain-specific identity (e.g. comparing only an `id` field).
+   */
+  equals(other: this): boolean
 }
 
 export interface ValueObjectConstructor<
@@ -190,6 +206,19 @@ export function define<
         return recursivelyToJSON(options.toJSON(this.props))
       }
       return recursivelyToJSON(this.props) as ToJSONOutput<JS>
+    }
+
+    equals(other: unknown): boolean {
+      if ((this as any) === other) return true
+      if (other === null || typeof other !== 'object') return false
+      if (!(ValueObjectIdSymbol in other)) return false
+      if (
+        (other as any)[ValueObjectIdSymbol] !==
+        (this as any)[ValueObjectIdSymbol]
+      ) {
+        return false
+      }
+      return deepEquals(this.props, (other as any).props)
     }
   }
 

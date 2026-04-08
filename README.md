@@ -39,6 +39,7 @@ JSON.stringify({ email })   // '{"email":"alice@example.com"}'
   - [Defining a value object](#defining-a-value-object)
   - [Custom JSON serialization](#custom-json-serialization)
   - [Composing value objects](#composing-value-objects)
+  - [Structural equality](#structural-equality)
   - [Extending a value object](#extending-a-value-object)
   - [Discriminated unions](#discriminated-unions)
 - [Schema Methods](#schema-methods)
@@ -197,6 +198,50 @@ const customer = Customer.fromJSON({
 customer.props.id instanceof UserId             // true
 customer.props.email instanceof Email           // true
 customer.props.addresses?.[0] instanceof Address // true
+```
+
+### Structural equality
+
+Every value object exposes an `equals(other)` method. Two instances are considered equal when they are of the same type and contain exactly the same data:
+
+- Object keys are compared in any order, recursively.
+- Arrays must have the same length and equal elements **in order**.
+- Nested value objects are compared via their own `equals()` — overrides cascade all the way down.
+- `Date` fields are compared by timestamp.
+
+```typescript
+const a = Address.fromJSON({ street: '123 Main St', city: 'Springfield', zipCode: '12345' })
+const b = Address.fromJSON({ zipCode: '12345', city: 'Springfield', street: '123 Main St' })
+
+a === b        // false — different references
+a.equals(b)    // true  — same data, key order is irrelevant
+
+const c = Address.fromJSON({ street: '123 Main St', city: 'Springfield', zipCode: '54321' })
+a.equals(c)    // false
+```
+
+You can override `equals()` to express domain-specific identity — comparing entities by `id`, treating emails case-insensitively, ignoring metadata fields, etc. The override is honoured everywhere the value object appears, including when it is nested inside another value object's props.
+
+```typescript
+class User extends ValueObject.define({
+  id: 'User',
+  schema: () => z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    updatedAt: z.string(),
+  }),
+}) {
+  override equals(other: User): boolean {
+    if (!(other instanceof User)) return false
+    return this.props.id === other.props.id
+  }
+}
+
+const id = '123e4567-e89b-12d3-a456-426614174000'
+const a = User.fromJSON({ id, name: 'Alice',         updatedAt: '2024-01-01' })
+const b = User.fromJSON({ id, name: 'Alice Renamed', updatedAt: '2024-12-31' })
+
+a.equals(b) // true — User identity is the id, not the snapshot
 ```
 
 ### Extending a value object
@@ -405,10 +450,11 @@ Returns an object with `fromJSON()`, `schema()`, and `isInstance()` methods.
 
 ### Instance members
 
-| Member        | Description                                                       |
-| ------------- | ----------------------------------------------------------------- |
-| `props`       | The validated, readonly data                                      |
-| `toJSON()`    | JSON-compatible representation (respects custom `toJSON` option)  |
+| Member            | Description                                                                       |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `props`           | The validated, readonly data                                                      |
+| `toJSON()`        | JSON-compatible representation (respects custom `toJSON` option)                  |
+| `equals(other)`   | Structural equality with deep, key-order-independent comparison; override-friendly |
 
 ### Static members
 
