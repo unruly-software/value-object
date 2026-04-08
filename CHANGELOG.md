@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 2.0.1
+
+### Patch Changes
+
+- a82f48e: Update NPM description
+
 ## 2.0.0
 
 ### Major Changes

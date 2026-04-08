@@ -1,7 +1,7 @@
 {
   "name": "@unruly-software/value-object",
   "packageManager": "yarn@3.5.0",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "license": "MIT",
   "description": "Typecript data modelling library for value objects on top of Zod schemas. Define a type once, get runtime validation, a real `class` you can attach methods to, and lossless `JSON.stringify` round-tripping.",
   "type": "module",
