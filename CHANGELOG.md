@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 2.0.0
+
+### Major Changes
+
+- f5003d5: Upgrade and extend value object interface to be comparable to other major alternatives
+
 ## 1.2.0
 
 ### Minor Changes
