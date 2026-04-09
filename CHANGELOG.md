@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 2.0.2
+
+### Patch Changes
+
+- 9a614da: Export private modules to allow private property access
+
 ## 2.0.1
 
 ### Patch Changes
