@@ -287,8 +287,8 @@ type SchemaOf<P> = P extends ValueObjectConstructor<string, infer Z, any>
   : never
 
 /** Methods/getters defined on the parent class, excluding structural members. */
-type ParentExtras<P> = Omit<
-  InstanceType<P & (new (...args: any[]) => any)>,
+type ParentExtras<P extends ValueObjectConstructor<string, any, any>> = Omit<
+  InstanceType<P>,
   keyof ValueObjectInstance<string, z.ZodTypeAny, unknown>
 >
 

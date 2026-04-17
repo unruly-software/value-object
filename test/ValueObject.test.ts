@@ -861,6 +861,12 @@ describe('ValueObject', () => {
       expect(b.domain).toBe('google.com')
       expect(b.isWorkspace).toBe(false)
       expect(a.equals(b)).toBe(true)
+
+      expectTypeOf(a.domain).toEqualTypeOf<string>()
+      expectTypeOf(a.isWorkspace).toEqualTypeOf<boolean>()
+      expectTypeOf(b).toEqualTypeOf<GoogleEmail>()
+      expectTypeOf(b.domain).toEqualTypeOf<string>()
+      expectTypeOf(b.isWorkspace).toEqualTypeOf<boolean>()
     })
   })
 })
