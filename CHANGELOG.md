@@ -1,5 +1,11 @@
 # @unruly-software/value-object
 
+## 2.1.0
+
+### Minor Changes
+
+- 69c6e5f: Allow extending value objects to retain getters
+
 ## 2.0.2
 
 ### Patch Changes
